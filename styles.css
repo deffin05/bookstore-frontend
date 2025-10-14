@@ -267,3 +267,58 @@ textarea {
 .checkbox-group input[type="checkbox"] {
     width: auto;
 }
+
+a {
+    color: white;
+    font-size: 1.4em;
+    font-weight: bold;
+}
+
+a:visited {
+    text-decoration: none;
+}
+
+a:link {
+    text-decoration: none;
+}
+
+
+.header,
+.logged {
+    display: flex;
+    justify-content: space-between;
+    align-items: space-between;
+    position: relative;
+}
+
+.logged {
+    gap: 20px;
+}
+
+
+.logged button {
+    font-size: 1.2em;
+    background: none;
+    font-weight: bold;
+}
+
+.logged button:hover {
+    background: none;
+    box-shadow: none;
+}
+
+.notLogged {
+    display: flex;
+    gap: 2em;
+    align-items: center;
+    margin-right: 1.5em;
+}
+
+.profile {
+    font-size: 1.5em;
+    color: white;
+    font-weight: bold;
+    margin-top: auto;
+    margin-bottom: auto;
+    margin-right: 1.5em;
+}

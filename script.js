@@ -1,5 +1,5 @@
-
 const API_BASE = 'http://localhost:8000'; // Change this to your Django server URL
+const API_AUTH = 'http://localhost:8000/api/token/'
 let currentEditId = null;
 let authorsData = [];
 let publishersData = [];
@@ -9,7 +9,8 @@ async function init() {
     await Promise.all([
         loadAuthors(),
         loadPublishers(),
-        loadBooks()
+        loadBooks(),
+        firstLogin()
     ]);
 }
 
@@ -61,6 +62,52 @@ async function loadBooks() {
     } catch (error) {
         showError('Failed to load books. Make sure your Django server is running.');
     }
+}
+
+async function isLoggedIn() {
+    if (!localStorage.getItem('accessToken')) return false;
+
+    const accessResponse = await fetch(API_AUTH + 'verify/', {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ "token": localStorage.getItem('accessToken') })
+    });
+
+    if (accessResponse.status == 200) {
+        return true;
+    };
+
+    const refreshResponse = await fetch(API_AUTH + 'refresh/', {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ "refresh": localStorage.getItem('refreshToken') })
+    });
+
+    if (refreshResponse.status == 200) {
+        localStorage.setItem('accessToken', (await refreshResponse.json()).access)
+        return true;
+    }
+
+    return false;
+}
+
+async function firstLogin() {
+    if (!(await isLoggedIn())) return;
+    document.getElementsByClassName('logged')[0].style.display = 'flex'
+    document.getElementsByClassName('notLogged')[0].style.display = 'none'
+
+    const response = await fetch(API_BASE + "/users/0", {
+        headers: {
+            "Authorization": "Bearer " + localStorage.accessToken
+        }
+    });
+
+    const data = await response.json()
+    document.getElementsByClassName('profile')[0].textContent = data.username
 }
 
 async function searchBooks() {
@@ -156,16 +203,25 @@ async function editBook(id) {
     }
 }
 
+function logout() {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    location.reload();
+}
+
 async function deleteBook(id) {
     if (!confirm('Are you sure you want to delete this book?')) return;
 
     try {
         const response = await fetch(`${API_BASE}/books/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { "Authorization": "Bearer " + localStorage.getItem('accessToken') }
         });
 
         if (response.ok) {
             loadBooks();
+        } else if (response.status == 401 || response.status == 403) {
+            showError("You don't have permissions to delete books");
         } else {
             showError('Failed to delete book');
         }
@@ -199,7 +255,8 @@ document.getElementById('bookForm').addEventListener('submit', async (e) => {
             response = await fetch(`${API_BASE}/books/${currentEditId}`, {
                 method: 'PATCH',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('accessToken')
                 },
                 body: JSON.stringify(bookData)
             });
@@ -207,7 +264,8 @@ document.getElementById('bookForm').addEventListener('submit', async (e) => {
             response = await fetch(`${API_BASE}/books/`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('accessToken')
                 },
                 body: JSON.stringify(bookData)
             });
@@ -216,6 +274,12 @@ document.getElementById('bookForm').addEventListener('submit', async (e) => {
         if (response.ok) {
             closeModal();
             loadBooks();
+        } else if ((response.status == 401 || response.status == 403) && currentEditId) {
+            showError("You don't have permissions to edit books");
+            closeModal();
+        } else if ((response.status == 401 || response.status == 403) && !currentEditId) {
+            showError("You don't have permissions to create books");
+            closeModal();
         } else {
             const error = await response.json();
             showError('Failed to save book: ' + JSON.stringify(error));
